@@ -1,0 +1,4 @@
+//Compilation Notes
+gcc miniShell.c -o minishell
+//Run
+./minishell
