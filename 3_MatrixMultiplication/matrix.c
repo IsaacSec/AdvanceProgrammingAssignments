@@ -1,64 +1,112 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <unistd.h>
 
-typedef struct _matrix{
+typedef struct _thread_data{
   int id;
   int cols;
   int rows;
-  int **matrix;
-}Matrix;
+  int **matrixA;
+  int **matrixB;
+  int **matrixC;
+  int diagonal;
+}thread_data;
+
+void peer_work (void *arg){
+  thread_data *data = (thread_data *) arg;
+  int **matrixA = (data->matrixA);
+  int **matrixB = (data->matrixB);
+  int **matrixC = (data->matrixC);
+  int id = data->id;
+  int size = data->rows;
+
+  for (int j=0; j<size; j++){
+      int result = 0;
+      for (int i=0; i<size; i++){
+          result += matrixA[id][i] * matrixB[i][j];
+      }
+      matrixC [id][j] = result;
+  }
+}
+
+void print_matrix( int **matrix, int size ) {
+	int row;
+	int col;
+	/*
+ 	* We loop through the matrix given to us and we print it out in the correct format
+ 	**/
+	for(row = 0; row < size; ++row) {
+		printf("[ ");
+		for(col = 0; col < size; ++col) {
+			printf(" %d ", matrix[row][col]);
+		}
+		printf(" ]\n");
+	}
+	printf("\n");
+}
 
 int main(){
 
-  int A[][3] =  {{1,2,3},{4,5,6},{7,8,9}};
-  int B[][3] =  {{2,0,0},{0,2,0},{0,0,2}};
-  Matrix *m  = (Matrix *) malloc (sizeof (Matrix) );
+  int size = 3;
 
-  m->id   = 0;
-  m->cols = 3;
-  m->rows = 3;
-  m->matrix = &A[0][0];
-    /*int aj=3, ai=3;
-    int bj=3, bi=3;
+  int **matrixA;
+  int **matrixB;
+  int **matrixC;
 
-    int matrixC[bj][ai];
+  matrixA = malloc(size * sizeof(int *));
+  matrixB = malloc(size * sizeof(int *));
+  matrixC = malloc(size * sizeof(int *));
 
-    int matrixA[][3] =  {{1,2,3},{4,5,6},{7,8,9}};
-    int matrixB[][3] =  {{2,0,0},{0,2,0},{0,0,2}};
-
-    // Normal process
-    for (int k=0; k<aj; k++){
-        for (int j=0; j<bi; j++){
-            int result = 0;
-            for (int i=0; i<ai; i++){
-                result += matrixA[k][i] * matrixB[i][j];
-            }
-            printf("%d ",result);
-        }
-        printf("\n");
+  for(int i=0 ; i<size ; i++){
+    matrixA[i] = malloc(size * sizeof(int *));
+    matrixB[i] = malloc(size * sizeof(int *));
+    matrixC[i] = malloc(size * sizeof(int *));
+  }
+  for(int row=0 ; row<size ; row++){
+    for (int col = 0; col<size; col++){
+      matrixA[row][col] = row*size+col+1;
     }
-    */
-    return EXIT_SUCCESS;
+  }
+  for(int row = 0; row<size ; row++){
+    for (int col = 0; col<size; col++){
+      matrixB[row][col] = 2;
+    }
+  }
+  for(int row = 0; row<size ; row++){
+    for (int col = 0; col<size; col++){
+      matrixC[row][col] = 0;
+    }
+  }
+
+  pthread_t threads[size];
+  thread_data * data = (thread_data *) malloc(sizeof(thread_data));
+
+  data-> cols = size;
+  data-> rows = size;
+  data-> diagonal = 0;
+  data-> matrixA = matrixA;
+  data-> matrixB = matrixB;
+  data-> matrixC = matrixC;
+
+  for (int i = 0; i < size ; i++) {
+    data-> id = i;
+    int code = pthread_create(&threads[i],NULL,(void *)peer_work,(void *)data);
+    if(code){
+      printf("[ERROR] at pthread_create() with CODE->(%d)\n", code);
+    }
+    printf("[Thread]  #%d\n", i);
+  }
+
+  for(int i = 0; i < size ;i++){
+    int code = pthread_join(threads[i],NULL);
+    if(code){
+      printf("[ERROR] pthread_join() with CODE->(%d)\n", code);
+    }
+    printf("[JOIN] thread #%d \n",i);
+  }
+
+  print_matrix(matrixC,size);
+
+  return EXIT_SUCCESS;
 }
-
-/*
-
-For this assignment you are required to implement a parallel version of the matrix
-multiplication algorithm. Your program should create N child threads that compute the
-multiplication of row i X column j of two square matrices and then send their results to
-the parent thread using thread synchronization.
-
-The parent thread assembles the data and prints out the resulting matrix. Make sure that
-the parent thread waits for its child  threads.
-
-Do not make any assumptions on the matrix size (i.e. this should be a constant defiined
-at compile time or an input at runtime). Although, you could write the application without
-a critical section make sure you use locks (either conditional or not) to access any shared
-data structures.
-
-Also one of the child threads must compute the sum of the elements of the main diagonal
-(or the diagonal for square matrices). This last requirement will need for you to synchronize
-with the other threads.
-
-*/
